@@ -1,0 +1,128 @@
+# truth_sql is what makes each number trustworthy: the expected answer is computed by a query
+# at eval time, never typed in by hand. expected_tools lists acceptable sets of tools.
+
+- id: count_reviews
+  category: numeric
+  question: How many reviews are in the dataset?
+  truth_sql: SELECT COUNT(*) AS v FROM reviews
+  tolerance: 0
+  expected_tools: [[run_sql]]
+
+- id: avg_rating
+  category: numeric
+  question: What is the overall average rating, to two decimals?
+  truth_sql: SELECT ROUND(AVG(rating), 2) AS v FROM reviews
+  tolerance: 0.01
+  expected_tools: [[run_sql]]
+
+- id: pct_negative
+  category: numeric
+  question: What percentage of reviews are negative (1 or 2 stars), to one decimal?
+  truth_sql: SELECT ROUND(100 * COUNTIF(rating <= 2) / COUNT(*), 1) AS v FROM reviews
+  tolerance: 0.1
+  expected_tools: [[run_sql]]
+
+- id: version_rating
+  category: numeric
+  question: What is the average rating of version 8.8.18.509, to two decimals?
+  truth_sql: SELECT ROUND(AVG(rating), 2) AS v FROM reviews WHERE app_version = '8.8.18.509'
+  tolerance: 0.01
+  expected_tools: [[run_sql]]
+
+- id: version_count
+  category: numeric
+  question: How many app versions have at least 50 reviews?
+  truth_sql: SELECT COUNTIF(NOT low_volume) AS v FROM releases
+  tolerance: 0
+  expected_tools: [[run_sql]]
+
+- id: rating_2023
+  category: trend
+  question: What was the average rating across all of 2023, to two decimals?
+  truth_sql: SELECT ROUND(AVG(rating), 2) AS v FROM reviews WHERE EXTRACT(YEAR FROM review_date) = 2023
+  tolerance: 0.01
+  expected_tools: [[run_sql]]
+
+- id: best_year
+  category: trend
+  question: Which calendar year had the highest average rating?
+  truth_sql: >-
+    SELECT CAST(EXTRACT(YEAR FROM review_date) AS STRING) AS v FROM reviews
+    GROUP BY v ORDER BY AVG(rating) DESC LIMIT 1
+  expected_tools: [[run_sql]]
+
+- id: worst_month_2023
+  category: trend
+  question: Which month of 2023 had the lowest average rating? Give the month name.
+  truth_sql: >-
+    SELECT FORMAT_DATETIME('%B', DATETIME_TRUNC(review_date, MONTH)) AS v FROM reviews
+    WHERE EXTRACT(YEAR FROM review_date) = 2023
+    GROUP BY v ORDER BY AVG(rating) LIMIT 1
+  expected_tools: [[run_sql]]
+
+- id: release_rating_change
+  category: release_comparison
+  question: >-
+    What were the average ratings of versions 8.7.92.521 and 8.8.18.509, each to two decimals?
+  truth_sql: >-
+    SELECT ROUND(AVG(IF(app_version = '8.7.92.521', rating, NULL)), 2) AS a,
+           ROUND(AVG(IF(app_version = '8.8.18.509', rating, NULL)), 2) AS b FROM reviews
+  tolerance: 0.01
+  expected_tools: [[run_sql]]
+
+- id: release_themes
+  category: release_comparison
+  question: Which themes changed the most between versions 8.7.92.521 and 8.8.18.509?
+  expected_tools: [[get_theme_trends], [run_sql]]
+
+- id: why_drop
+  category: release_comparison
+  question: Why did ratings drop after version 8.8.18.509?
+  needs_citation: true
+  expected_tools: [[search_reviews, run_sql], [search_reviews, get_theme_trends]]
+
+- id: one_star_complaints
+  category: theme_explanation
+  question: What do 1-star reviewers complain about?
+  needs_citation: true
+  expected_tools: [[search_reviews]]
+
+- id: five_star_love
+  category: theme_explanation
+  question: What do 5-star reviewers love?
+  needs_citation: true
+  expected_tools: [[search_reviews]]
+
+- id: largest_theme
+  category: theme_explanation
+  question: What is the largest review theme, not counting Other?
+  truth_sql: >-
+    SELECT t.name AS v FROM review_themes AS rt JOIN themes AS t USING (theme_id)
+    WHERE t.name != 'Other' GROUP BY v ORDER BY COUNT(*) DESC LIMIT 1
+  expected_tools: [[run_sql]]
+
+- id: ad_opinions
+  category: theme_explanation
+  question: What do reviewers say about ads?
+  needs_citation: true
+  expected_tools: [[search_reviews]]
+
+- id: refuse_revenue
+  category: refuse
+  question: What was Spotify's revenue in 2023?
+  must_refuse: true
+
+- id: refuse_users
+  category: refuse
+  question: How many monthly active users does Spotify have?
+  must_refuse: true
+
+- id: refuse_future
+  category: refuse
+  question: How did ratings change in 2025?
+  must_refuse: true
+
+- id: refuse_competitor
+  category: refuse
+  question: Is Apple Music rated higher than Spotify?
+  must_refuse: true

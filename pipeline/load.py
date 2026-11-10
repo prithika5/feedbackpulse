@@ -49,20 +49,42 @@ def load_all(processed_dir: Path) -> dict[str, int]:
     if not cleaned_by_app:
         raise FileNotFoundError(f"No cleaned reviews found under {processed_dir}")
 
+    return {
+        table: _replace_table(client, dataset, table, frame, processed_dir)
+        for table, frame in build_tables(cleaned_by_app).items()
+    }
+
+
+def load_themes(
+    themes: pd.DataFrame, review_themes: pd.DataFrame, processed_dir: Path
+) -> dict[str, int]:
+    """Replace the themes and review_themes tables."""
+    dataset = os.environ.get("BQ_DATASET", "feedbackpulse")
+    client = bigquery.Client(project=os.environ["GCP_PROJECT_ID"], location="US")
+    tables = {"themes": themes, "review_themes": review_themes}
+    return {
+        table: _replace_table(client, dataset, table, frame, processed_dir)
+        for table, frame in tables.items()
+    }
+
+
+def _replace_table(
+    client: bigquery.Client, dataset: str, table: str, frame: pd.DataFrame, processed_dir: Path
+) -> int:
     load_dir = processed_dir / "_load"
     load_dir.mkdir(exist_ok=True)
-    loaded = {}
-    for table, frame in build_tables(cleaned_by_app).items():
-        path = load_dir / f"{table}.parquet"
-        frame.to_parquet(path, index=False)
-        table_id = f"{client.project}.{dataset}.{table}"
-        config = bigquery.LoadJobConfig(
-            source_format=bigquery.SourceFormat.PARQUET,
-            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
-            # Without this, the load would replace our declared schema with Parquet's guess.
-            schema=client.get_table(table_id).schema,
-        )
-        with path.open("rb") as file:
-            job = client.load_table_from_file(file, table_id, job_config=config)
-        loaded[table] = job.result(timeout=LOAD_TIMEOUT_SECONDS).output_rows
-    return loaded
+    path = load_dir / f"{table}.parquet"
+    frame.to_parquet(path, index=False)
+    table_id = f"{client.project}.{dataset}.{table}"
+    parquet_options = bigquery.ParquetOptions()
+    parquet_options.enable_list_inference = True  # Needed to load keywords as ARRAY<STRING>.
+    config = bigquery.LoadJobConfig(
+        source_format=bigquery.SourceFormat.PARQUET,
+        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+        parquet_options=parquet_options,
+        # Without this, the load would replace our declared schema with Parquet's guess.
+        schema=client.get_table(table_id).schema,
+    )
+    with path.open("rb") as file:
+        job = client.load_table_from_file(file, table_id, job_config=config)
+    return job.result(timeout=LOAD_TIMEOUT_SECONDS).output_rows

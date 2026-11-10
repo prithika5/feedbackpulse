@@ -1,0 +1,12 @@
+fastapi>=0.115
+uvicorn>=0.30
+sse-starlette>=2
+pydantic>=2
+python-dotenv>=1
+google-cloud-bigquery>=3.25
+google-genai>=1.0
+psycopg[binary]>=3.2
+pgvector>=0.3
+sqlglot>=25
+fastembed>=0.5
+numpy>=2

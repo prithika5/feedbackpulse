@@ -1,0 +1,5 @@
+# Upload only what the API image needs. Everything else, including .env, stays local.
+*
+!api/
+!api/**
+**/__pycache__/
