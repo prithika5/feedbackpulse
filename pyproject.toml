@@ -10,6 +10,8 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["ruff>=0.6", "pytest>=8"]
+# Only needed to run notebooks/ (data exploration), not the pipeline or API.
+explore = ["pandas>=2", "matplotlib>=3.8", "nbconvert>=7", "ipykernel>=6"]
 
 [tool.setuptools]
 packages = ["pipeline", "api", "evals"]
@@ -25,3 +27,7 @@ select = ["E", "F", "I", "B", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff.lint.per-file-ignores]
+# Notebooks are exploratory: allow long one-off lines and compact plotting calls.
+"*.ipynb" = ["E501", "E702"]
