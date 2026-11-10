@@ -1,0 +1,27 @@
+[project]
+name = "feedbackpulse"
+version = "0.1.0"
+description = "AI product-feedback analyst: themes, ratings, and releases from app reviews."
+readme = "README.md"
+requires-python = ">=3.11"
+# Runtime dependencies are added step by step as each stage is built,
+# so the install stays small and every package has a reason to be here.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["ruff>=0.6", "pytest>=8"]
+
+[tool.setuptools]
+packages = ["pipeline", "api", "evals"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["web"]
+
+[tool.ruff.lint]
+# E/F = pycodestyle + pyflakes basics, I = import sorting, B = common bug patterns, UP = modern syntax
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,42 @@
+# --- Secrets: never commit these ---
+.env
+.env.local
+.env.*.local
+*.pem
+*-key.json
+*service-account*.json
+credentials.json
+gcloud-key*.json
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# --- Data (raw datasets are large; documented in DATA_SOURCES.md instead) ---
+data/raw/
+data/processed/
+*.parquet
+*.csv.gz
+
+# --- Caches / local artifacts ---
+.cache/
+.llm_cache/
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# --- OS / editor ---
+.DS_Store
+.vscode/
+.idea/
