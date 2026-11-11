@@ -12,7 +12,12 @@ from dotenv import load_dotenv
 
 from pipeline import store
 from pipeline.clean import clean_reviews
-from pipeline.cluster import cluster_reviews, reduce_dimensions
+from pipeline.cluster import (
+    cluster_reviews,
+    merge_similar_clusters,
+    reduce_dimensions,
+    score_labels,
+)
 from pipeline.embed import cache_path, embed_reviews, read_vectors
 from pipeline.ingest import APPS, AppSource, ingest
 from pipeline.label import label_cluster
@@ -51,6 +56,8 @@ def run_themes(source: AppSource, model_name: str) -> None:
     size, labels, scores = cluster_reviews(reduced)
     themes_found, noise = scores[size]
     print(f"  {source.app_id}: min_cluster_size={size}, {themes_found} themes, {noise:.1%} noise")
+    labels = merge_similar_clusters(vectors, labels)
+    print(f"  after merging overlapping clusters: {score_labels(labels)[0]} themes")
 
     themes, review_themes = build_theme_tables(
         source.app_id, reviews, vectors, labels, label_cluster

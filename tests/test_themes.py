@@ -8,6 +8,7 @@ from pipeline.cluster import (
     MIN_THEMES,
     assign_noise,
     choose_labels,
+    merge_similar_clusters,
     representative_indices,
 )
 from pipeline.label import ThemeLabel
@@ -114,3 +115,28 @@ def test_assign_noise_respects_the_threshold():
 def test_assign_noise_with_no_themes_changes_nothing():
     labels = np.array([-1, -1, -1, -1])
     assert assign_noise(unit_vectors(), labels).tolist() == labels.tolist()
+
+
+def test_merge_combines_only_clusters_above_the_threshold():
+    vectors = np.array([[1.0, 0.0], [0.999, 0.045], [0.0, 1.0], [0.1, 0.995]])
+    labels = np.array([3, 5, 8, 8])
+    assert merge_similar_clusters(vectors, labels, threshold=0.9).tolist() == [3, 3, 8, 8]
+    assert merge_similar_clusters(vectors, labels, threshold=0.9999).tolist() == [3, 5, 8, 8]
+
+
+def test_merge_follows_chains_and_leaves_noise_alone():
+    angles = np.radians([0, 20, 40, 90])
+    vectors = np.column_stack([np.cos(angles), np.sin(angles)])
+    labels = np.array([1, 2, 3, -1])
+    assert merge_similar_clusters(vectors, labels, threshold=0.9).tolist() == [1, 1, 1, -1]
+
+
+def test_clusters_given_the_same_name_become_one_theme():
+    vectors = np.array([[1.0, 0.0], [0.99, 0.141], [0.0, 1.0], [0.141, 0.99]])
+    reviews = pd.DataFrame({"review_id": list("abcd"), "text": list("wxyz")})
+    labels = np.array([0, 0, 1, 1])
+    themes, review_themes = build_theme_tables(
+        "spotify", reviews, vectors, labels, lambda _: ThemeLabel(**valid_label())
+    )
+    assert len(themes) == 1
+    assert set(review_themes["theme_id"]) == {theme_id_for("spotify", 0)}

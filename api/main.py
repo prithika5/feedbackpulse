@@ -23,6 +23,8 @@ ALLOWED_APPS = {"spotify"}
 app = FastAPI(title="FeedbackPulse API")
 cache = AnswerCache()
 limiter = RateLimiter(max_requests=20, window_seconds=60)
+# The API is public, so this caps what any mix of callers can spend from the Gemini quota.
+daily_limiter = RateLimiter(max_requests=200, window_seconds=86_400)
 
 
 def client_ip(request: Request) -> str:
@@ -81,4 +83,6 @@ async def ask(body: AskRequest, request: Request) -> EventSourceResponse:
         raise HTTPException(status_code=404, detail="Unknown app")
     if not limiter.allow(client_ip(request)):
         raise HTTPException(status_code=429, detail="Too many questions. Please wait a minute.")
+    if not daily_limiter.allow("all"):
+        raise HTTPException(status_code=429, detail="The demo's daily limit has been reached.")
     return EventSourceResponse(iterate_in_threadpool(answer_events(body.question, body.app_id)))

@@ -138,3 +138,30 @@ def test_ask_is_rate_limited(monkeypatch):
     monkeypatch.setattr(main, "limiter", RateLimiter(1, 60))
     assert client.post("/ask", json={"question": "first question"}).status_code == 200
     assert client.post("/ask", json={"question": "second question"}).status_code == 429
+
+
+def test_citation_with_extra_words_in_the_bracket_is_linked():
+    text, citations = link_citations(f"Ads [e.g., {REVIEW_ID}].", {REVIEW_ID: REVIEW})
+    assert text == "Ads [1]."
+    assert len(citations) == 1
+
+
+def test_bare_review_ids_never_reach_the_reader():
+    fake_id = "00000000-aaaa-bbbb-cccc-000000000000"
+    text, citations = link_citations(f"Ads {REVIEW_ID} and {fake_id}.", {REVIEW_ID: REVIEW})
+    assert REVIEW_ID not in text and fake_id not in text
+    assert "[1]" in text
+    assert len(citations) == 1
+
+
+def test_bracketed_words_are_not_mistaken_for_citations():
+    assert link_citations("See [important information] here.", {})[0] == (
+        "See [important information] here."
+    )
+
+
+def test_daily_limit_applies_across_all_callers(monkeypatch):
+    client = make_client(monkeypatch)
+    monkeypatch.setattr(main, "daily_limiter", RateLimiter(1, 86_400))
+    assert client.post("/ask", json={"question": "first question"}).status_code == 200
+    assert client.post("/ask", json={"question": "second question"}).status_code == 429

@@ -16,6 +16,10 @@ CLUSTER_SELECTION_METHOD = "leaf"
 # Leaf clustering leaves most reviews unassigned. A noise review joins its closest theme only
 # at this cosine similarity or above. Reading borderline examples showed they still fit.
 NOISE_ASSIGNMENT_THRESHOLD = 0.55
+# Clusters this similar are one topic split in two. Tuned by reading ranked pairs on Spotify:
+# pairs at 0.855 and above were true overlaps, and the next pair (0.850) was unrelated.
+# The cutoff sits midway between them. That gap is narrow, so re-check it for any new data.
+MERGE_SIMILARITY_THRESHOLD = 0.8525
 
 
 def reduce_dimensions(vectors: np.ndarray, cache_file: Path | None = None) -> np.ndarray:
@@ -67,6 +71,36 @@ def cluster_reviews(reduced: np.ndarray) -> tuple[int, np.ndarray, dict[int, tup
     }
     best_size, labels = choose_labels(candidates)
     return best_size, labels, {size: score_labels(found) for size, found in candidates.items()}
+
+
+def merge_similar_clusters(
+    vectors: np.ndarray, labels: np.ndarray, threshold: float = MERGE_SIMILARITY_THRESHOLD
+) -> np.ndarray:
+    """Combine clusters whose centres nearly coincide. Each group takes its lowest label."""
+    themes = sorted(set(labels.tolist()) - {NOISE_LABEL})
+    if len(themes) < 2:
+        return labels.copy()
+    centroids = np.stack([vectors[labels == theme].mean(axis=0) for theme in themes])
+    centroids = centroids / np.linalg.norm(centroids, axis=1, keepdims=True)
+    similarities = centroids @ centroids.T
+
+    group = {theme: theme for theme in themes}
+
+    def root(theme: int) -> int:
+        while group[theme] != theme:
+            theme = group[theme]
+        return theme
+
+    for i, first in enumerate(themes):
+        for j in range(i + 1, len(themes)):
+            if similarities[i, j] >= threshold:
+                low, high = sorted((root(first), root(themes[j])))
+                group[high] = low
+
+    merged = labels.copy()
+    for theme in themes:
+        merged[labels == theme] = root(theme)
+    return merged
 
 
 def assign_noise(

@@ -35,6 +35,7 @@ def build_theme_tables(
     distances = np.zeros(len(reviews))
     themes = []
     core_labels, labels = labels, assign_noise(vectors, labels)
+    first_label_by_name: dict[str, int] = {}
 
     for label in sorted(set(labels.tolist())):
         members = np.flatnonzero(labels == label)
@@ -51,6 +52,10 @@ def build_theme_tables(
             closest = representative_indices(vectors, core_labels, label, REPRESENTATIVE_REVIEWS)
             theme = labeler([str(texts[i]) for i in closest])
             name = theme.name
+            first_with_name = first_label_by_name.setdefault(name.casefold(), label)
+            if first_with_name != label:  # Two clusters given one name are one theme.
+                labels[members] = first_with_name
+                continue
         themes.append(
             {
                 "theme_id": theme_id_for(app_id, label),

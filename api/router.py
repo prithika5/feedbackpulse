@@ -21,7 +21,9 @@ LLM_TIMEOUT_MS = 45_000
 MAX_LLM_ATTEMPTS = 4
 RETRYABLE_CODES = {429, 500, 503}
 BRACKET_RE = re.compile(r"\[([^\[\]]+)\]")
-ID_LIKE_RE = re.compile(r"[\w-]{8,64}")
+ID_TOKEN_RE = re.compile(r"[\w-]{8,64}")
+UUID_PATTERN = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+UUID_RE = re.compile(UUID_PATTERN)
 
 _STRING = {"type": "STRING"}
 TOOL_DECLARATIONS = [
@@ -155,15 +157,22 @@ def link_citations(answer: str, retrieved: dict[str, dict]) -> tuple[str, list[d
     """Turn [review_id] into [1], and strip IDs the search never returned."""
     numbers: dict[str, int] = {}
 
-    def replace(match: re.Match) -> str:
-        # The model sometimes puts several IDs in one bracket: [id1, id2].
-        parts = [part.strip() for part in match.group(1).split(",")]
-        if not all(ID_LIKE_RE.fullmatch(part) for part in parts):
-            return match.group(0)  # Ordinary bracketed text, like [URL], stays as it is.
-        known = [part for part in parts if part in retrieved]
-        return "".join(f"[{numbers.setdefault(part, len(numbers) + 1)}]" for part in known)
+    def marker(review_id: str) -> str:
+        return f"[{numbers.setdefault(review_id, len(numbers) + 1)}]"
 
-    linked = re.sub(r"\s+([.,;:!?])", r"\1", BRACKET_RE.sub(replace, answer)).strip()
+    def replace_bracket(match: re.Match) -> str:
+        # The model writes citations in varied ways, such as [id1, id2] or [e.g., id1].
+        tokens = ID_TOKEN_RE.findall(match.group(1))
+        ids = [t for t in tokens if t in retrieved or UUID_RE.fullmatch(t)]
+        if not ids:
+            return match.group(0)  # Ordinary bracketed text, like [URL], stays as it is.
+        return "".join(marker(t) for t in ids if t in retrieved)
+
+    def replace_bare_id(match: re.Match) -> str:
+        return marker(match.group(0)) if match.group(0) in retrieved else ""
+
+    linked = UUID_RE.sub(replace_bare_id, BRACKET_RE.sub(replace_bracket, answer))
+    linked = re.sub(r"\s+([.,;:!?])", r"\1", linked).strip()
     citations = [
         {"number": number, **retrieved[review_id]} for review_id, number in numbers.items()
     ]
